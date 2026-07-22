@@ -13,6 +13,35 @@ The video(s) must show the real application flow(s) on the changed branch. Do no
 
 Before deciding the flow(s) are blocked, set up the real local environment: changed branch, isolated worktree/checkout when needed, branch-specific database/environment, app-supported seed data, required feature flags, backend services, frontend services, and authenticated seeded/test user session. If the real application flow(s) still cannot be recorded after those setup steps, stop and report the blocker. Do not produce substitute video(s).
 
+## Where Artifacts Live
+
+Recording artifacts go in a persistent, agent-agnostic home directory, **never** the session
+scratchpad. A CLI's working temp (`/tmp/...`, `~/.claude`, `~/.codex`, or wherever the current
+agent stages temp files) is reaped by the OS and is not portable across Claude Code / Codex /
+other CLIs — anything left there is lost.
+
+Base (repo- and agent-independent): `~/ui-walkthroughs/<ticket-or-pr>/`
+
+```
+~/ui-walkthroughs/<ticket-or-pr>/
+  <ticket-or-pr>-<flow-slug>.mp4 / .webm          # video outputs (regenerable)
+  scripts/<ticket-or-pr>-<flow-slug>.record.mjs   # the recording script — the durable source of truth
+  scripts/auth-setup.mjs                          # out-of-frame login that persists storageState
+  scripts/package.json                            # pins playwright
+  seed/<ticket-or-pr>.dump                        # demo DB snapshot + a note on how it was made
+```
+
+The **script is the durable asset; the video is a regenerable output.** Persist the script,
+auth setup, and seed here the moment they work — do not leave them in the scratchpad, even
+mid-task. Do NOT hardcode a repo path (e.g. a specific worktree) as the base: worktrees are
+temporary and vanish on cleanup, and the path differs per user.
+
+**Re-recording an existing target — check here first.** Before writing any script,
+`ls ~/ui-walkthroughs/<ticket-or-pr>/scripts/` and update the existing `.record.mjs` instead
+of rewriting from scratch. Use that deterministic listing, never a fuzzy `find` by feature
+keyword — a keyword search misses a generically-named script (`record.mjs`, `record1.js`) and
+reports a false "no prior script exists", wasting a full rewrite.
+
 ## Fast Workflow
 
 Start with a short critical-path plan. Identify what the main agent must do locally now, then delegate independent discovery and verification work to subagents when available. Keep the actual browser recording on the main thread so the final video has one coherent flow.
@@ -37,6 +66,7 @@ If subagents are unavailable, follow the same lane structure yourself without st
    - **Derive scope mechanically from the diff, not from memory or the PR text.** Compute the actual change set: `git diff <base>...HEAD` **plus uncommitted work** (`git status --short`, `git diff`, `git diff --staged`) — work is often not committed yet. Every changed user-visible file is a candidate surface.
    - Read enough changed code to know the user-visible feature surface.
    - Decide whether one video is enough. Create multiple videos only when the feature has distinct flows that would make one video confusing.
+   - **If re-recording an existing target, `ls ~/ui-walkthroughs/<ticket-or-pr>/scripts/` and reuse/update the prior `.record.mjs`** rather than rewriting (see "Where Artifacts Live"). Re-derive the demo scope from the diff, but start from the existing script.
 
 2. **Run the app**
    - Start required backend/frontend services using existing repo scripts.
@@ -141,9 +171,15 @@ Minimal pattern:
 import { chromium } from "@playwright/test";
 import path from "node:path";
 
-const outDir = path.resolve("artifacts/ui-walkthrough");
-const webmPath = path.join(outDir, "<pr-or-ticket>-<flow-slug>.webm");
-const authFile = path.join(outDir, "auth-state.json");
+// Persistent, agent-agnostic base — see "Where Artifacts Live". Never the scratchpad.
+const baseDir = path.join(
+  process.env.HOME,
+  "ui-walkthroughs",
+  "<pr-or-ticket>",
+);
+const webmPath = path.join(baseDir, "<pr-or-ticket>-<flow-slug>.webm");
+const authFile = path.join(baseDir, "scripts", "auth-state.json");
+const outDir = baseDir;
 
 const browser = await chromium.launch({ headless: true });
 
@@ -211,25 +247,25 @@ Use short in-video callout banners when they make the walkthrough easier to unde
 - Use visible waits, hover/highlight, and short pauses around the changed UI so reviewers can see it.
 - Avoid random navigation. Every action in the video(s) must map to acceptance checks.
 - Record the final changed branch, after validation passes.
-- Name files predictably: `artifacts/ui-walkthrough/<ticket-or-pr>-<flow-slug>.webm` and `artifacts/ui-walkthrough/<ticket-or-pr>-<flow-slug>.mp4`.
+- Name files predictably under the persistent base (see "Where Artifacts Live"): videos `~/ui-walkthroughs/<ticket-or-pr>/<ticket-or-pr>-<flow-slug>.webm` / `.mp4`, and the script `~/ui-walkthroughs/<ticket-or-pr>/scripts/<ticket-or-pr>-<flow-slug>.record.mjs`.
 - Verify each video is nonblank and includes the expected UI by extracting preview frames.
 
 Standard MP4 conversion:
 
 ```bash
 ffmpeg -y \
-  -i artifacts/ui-walkthrough/<ticket-or-pr>-<flow-slug>.webm \
+  -i ~/ui-walkthroughs/<ticket-or-pr>/<ticket-or-pr>-<flow-slug>.webm \
   -c:v libx264 \
   -pix_fmt yuv420p \
   -movflags +faststart \
-  artifacts/ui-walkthrough/<ticket-or-pr>-<flow-slug>.mp4
+  ~/ui-walkthroughs/<ticket-or-pr>/<ticket-or-pr>-<flow-slug>.mp4
 ```
 
 Preview-frame check:
 
 ```bash
-ffprobe -v error -show_entries format=duration,size -of default=noprint_wrappers=1 artifacts/ui-walkthrough/<ticket-or-pr>-<flow-slug>.mp4
-ffmpeg -y -ss 00:00:05 -i artifacts/ui-walkthrough/<ticket-or-pr>-<flow-slug>.mp4 -frames:v 1 -update 1 artifacts/ui-walkthrough/<ticket-or-pr>-<flow-slug>-preview.png
+ffprobe -v error -show_entries format=duration,size -of default=noprint_wrappers=1 ~/ui-walkthroughs/<ticket-or-pr>/<ticket-or-pr>-<flow-slug>.mp4
+ffmpeg -y -ss 00:00:05 -i ~/ui-walkthroughs/<ticket-or-pr>/<ticket-or-pr>-<flow-slug>.mp4 -frames:v 1 -update 1 ~/ui-walkthroughs/<ticket-or-pr>/<ticket-or-pr>-<flow-slug>-preview.png
 ```
 
 ## Delegation Prompts
