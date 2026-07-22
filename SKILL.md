@@ -102,7 +102,8 @@ If subagents are unavailable, follow the same lane structure yourself without st
    - Encode to MP4 unless the user requested another format.
    - Verify duration, resolution, frame count, and file existence.
    - Inspect representative frames from the beginning, middle, and end.
-   - **Coverage gate (diff-driven).** List every changed user-facing surface from step 1's diff and assert each one appears in the video, or explicitly log why it was omitted. "Covers the headline feature" is not enough — refactors and secondary states (a toggle's off-state, each call site of a shared component) are in the diff and must be covered.
+   - **Coverage gate (diff-driven).** List every changed user-facing surface from step 1's diff and assert each one appears in the video, or explicitly log why it was omitted. "Covers the headline feature" is not enough — refactors and secondary states (a toggle's off-state, each call site of a shared component) are in the diff and must be covered. Generated documents count as surfaces: a changed PDF template/generator/export must appear as an interstitial (see "Documents and PDFs in the flow").
+   - **Interstitial frame check.** Extract at least one frame per document interstitial and confirm the artifact is legible and the title/callout text renders cleanly (mojibake in the title bar means the viewer page is missing its charset declaration).
    - Verify the _real_ duration — frozen-frame padding can inflate the reported duration; trim or normalise so playback has no dead tail.
    - **Dead-air check.** Scan mid-flow for any stretch where the UI does not change for more than ~3s. That almost always means a step silently failed and the next one timed out (see the fail-fast rule). Find the broken step, fix it, and re-record — never ship a video with a frozen stretch sitting on a static screen.
 
@@ -125,6 +126,7 @@ Build a `Walkthrough Plan` before recording:
 - If all checks belong to one continuous reviewer flow, record one video.
 - If checks touch unrelated routes/pages/workflows, record one video per distinct flow.
 - If the diff adds a gated feature, include both the enabled path(s) and, when cheap, the disabled/non-regression path(s).
+- **List the documents the flow produces or the diff touches** — PDF templates, generators, exports, receipts. Each one is a demo beat: show the real artifact at the point in the flow where it is produced (see "Documents and PDFs in the flow").
 - Use only real app-supported setup: existing local fixtures, documented seed scripts, documented test credentials, existing storage state, or a real backend/dev API environment.
 - Prefer a real seeded user. Do not fabricate localStorage sessions, bypass auth, mock accounts, or patch app code to skip permissions.
 - Do not invent happy path(s) that the app cannot actually show.
@@ -225,6 +227,55 @@ if (!video) throw new Error("No Playwright video was created");
 await video.saveAs(webmPath);
 console.log(webmPath);
 ```
+
+## Documents and PDFs in the Flow
+
+When the flow generates or serves a document — an invoice PDF, a report, a receipt, an
+export — that artifact is part of the real application flow, and the walkthrough must show
+it at the point it is produced. Interleave: app scenes → the real document → back into the
+app. This is not a "substitute page" (see the Non-Negotiable Rule): the artifact shown is
+the flow's genuine output, fetched the same way the app fetches it.
+
+Why it needs special handling: **headless Chromium cannot render a PDF in-page**, and apps
+usually `window.open` PDFs into a popup the recorded page never shows (keep a
+`context.on('page', p => p.close())` popup-closer so those tabs don't linger). Displaying
+the artifact therefore takes three steps, all encapsulated in the bundled helper:
+
+1. **Fetch the real artifact mid-take**, after the app step that generates it, using the
+   same API the app calls (reuse the session/token captured during auth setup). Never show
+   a pre-generated stand-in whose content couldn't include this take's data.
+2. **Convert a page to PNG** (`pdftoppm -png -singlefile`, `sips` fallback on macOS).
+3. **Navigate the recorded page to a minimal local viewer page** showing the image with a
+   title bar and optional callout, dwell ~5s, then `goto` back into the app. The viewer
+   must declare `<meta charset="utf-8">` — without it, em dashes and curly quotes in the
+   title render as mojibake on `file://` pages (a real retake cause).
+
+**Use the bundled helper instead of hand-writing this.** Copy
+[scripts/pdf-interstitial.mjs](./scripts/pdf-interstitial.mjs) into the walkthrough's
+`scripts/` dir next to the record script, then:
+
+```ts
+import { showPdfInterstitial } from "./pdf-interstitial.mjs";
+
+// after the app step that generated the document, fetch the real bytes:
+fs.writeFileSync(
+  pdfPath,
+  Buffer.from(await (await fetch(signedUrl)).arrayBuffer()),
+);
+await showPdfInterstitial(page, {
+  pdfPath,
+  title: "Invoice PDF — as the customer receives it",
+  callout: "Add-ons appear as ordinary lines; totals include them",
+  workDir: scriptsDir,
+});
+await page.goto(nextAppRoute); // continue the app flow
+```
+
+**Slow generators: pre-warm asynchronously.** If producing the document is slow (a
+server-side render, a Python/reporting pipeline), kick the generation off in the
+background _right after the app step that makes it possible_ and `await` the promise only
+when its scene arrives — earlier scenes play while it renders, so the recording never sits
+in dead air waiting for it.
 
 ## Callout Banners
 
