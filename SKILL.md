@@ -353,6 +353,32 @@ ffprobe -v error -show_entries format=duration,size -of default=noprint_wrappers
 ffmpeg -y -ss 00:00:05 -i ~/ui-walkthroughs/<ticket-or-pr>/<ticket-or-pr>-<flow-slug>.mp4 -frames:v 1 -update 1 ~/ui-walkthroughs/<ticket-or-pr>/<ticket-or-pr>-<flow-slug>-preview.png
 ```
 
+## Attach the Video to the PR
+
+The usual home for the video is the PR description. The GitHub CLI uploads it natively with
+`--attach`; do not use a browser to upload it.
+
+1. Attach the mp4. With no body flag, `gh` keeps the existing body and appends the video:
+
+   ```bash
+   gh pr edit <pr-url> --attach ~/ui-walkthroughs/<ticket-or-pr>/<ticket-or-pr>-<flow-slug>.mp4
+   ```
+
+   Do not add `#<alt text>` after the path. `gh` accepts alt text for images only, and a video
+   with alt text fails with `cannot set alt text on video`.
+
+2. Read the uploaded URL back from the body:
+
+   ```bash
+   gh pr view <pr-url> --json body -q .body | grep -o -E 'https://github.com/user-attachments/assets/[a-f0-9-]+' | tail -n 1
+   ```
+
+3. Move it under a `## Demo` heading with one line on what the video shows, then write the
+   body back with `gh pr edit <pr-url> --body-file <file>`. A bare asset URL on its own line
+   renders as an inline player.
+4. For a paired PR (for example a backend and a frontend PR), put the same URL in the other
+   PR's description. Upload once.
+
 ## Delegation Prompts
 
 Use concise, bounded prompts. Tell worker agents they are not alone in the codebase and should not revert unrelated changes.
