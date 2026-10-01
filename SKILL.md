@@ -27,6 +27,9 @@ Base (repo- and agent-independent): `~/ui-walkthroughs/<ticket-or-pr>/`
   <ticket-or-pr>-<flow-slug>.mp4 / .webm          # video outputs (regenerable)
   scripts/<ticket-or-pr>-<flow-slug>.record.mjs   # the recording script — the durable source of truth
   scripts/auth-setup.mjs                          # out-of-frame login that persists storageState
+  scripts/walkthrough-kit.mjs                     # copied from this skill: cursor, captions, cut marks
+  scripts/build-walkthrough.mjs                   # copied from this skill: title card, caption bar, join
+  takes/<take>.webm + <take>.marks.json           # raw takes (regenerable)
   scripts/package.json                            # pins playwright
   seed/<ticket-or-pr>.dump                        # demo DB snapshot + a note on how it was made
 ```
@@ -83,7 +86,7 @@ If subagents are unavailable, follow the same lane structure yourself without st
 
 4. **Write the walkthrough plan**
    - Make the script feature-led, not test-led.
-   - Prefer captions or a short visible narrative when audio narration is unavailable.
+   - Use the title card, caption bar and orange cursor from "Standard Look" in every video.
    - Show before/entry context, the changed control or display, the interaction flow, and the final confirmation state.
    - Avoid unrelated product tours.
 
@@ -94,7 +97,7 @@ If subagents are unavailable, follow the same lane structure yourself without st
    - **Determinism gate — the recording is a rehearsed path, not a search.** The script navigates directly to the targets pinned during scouting. No loops over lists, no `if found / else next`, no try-and-retry, no "click until X appears" on screen. If any step is still conditional or searching, it is not ready to record — resolve it off-camera first.
    - **Fail fast — never swallow a failed action in the recording.** Do not wrap recording clicks/navigations in `.catch(() => {})`. A swallowed failure (e.g. a tab click that didn't land) leaves the _next_ action to wait out its full timeout while the screen sits unchanged — recording as a long frozen/dead segment. Let a failed step throw and abort the take. Set a **short** Playwright action/navigation timeout (~8–10s, not the 30s default) so any mistake fails fast instead of producing dead air. After a view change (tab switch, navigation, dialog open), assert the expected element is present before the next action.
    - Prefer Playwright `recordVideo` when available. Use a reliable browser screenshot-to-MP4 path only when Playwright recording is unavailable or impractical in the current environment.
-   - Capture at a readable viewport, usually desktop first unless the PR is mobile-specific.
+   - Capture at a readable viewport, usually desktop first unless the PR is mobile-specific. Default to 1440x1240: a shorter window puts the last block of the page under any fixed bottom bar, and scrolling cannot clear it.
    - Use deliberate pauses after each changed interaction.
    - If the first capture has a wrong click, missed menu, blank page, or unclear caption, recapture rather than handing over a flawed artifact.
 
@@ -187,7 +190,7 @@ const browser = await chromium.launch({ headless: true });
 
 // 1) Authenticate out-of-frame: real login in a throwaway context, persist the real session.
 const setup = await browser.newContext({
-  viewport: { width: 1440, height: 1000 },
+  viewport: { width: 1440, height: 1240 },
 });
 const setupPage = await setup.newPage();
 await setupPage.goto(process.env.LOGIN_URL ?? "http://localhost:3000/login");
@@ -202,11 +205,11 @@ await setup.close();
 
 // 2) Record already authenticated — the login screen never appears in the video.
 const context = await browser.newContext({
-  viewport: { width: 1440, height: 1000 },
+  viewport: { width: 1440, height: 1240 },
   storageState: authFile,
   recordVideo: {
     dir: outDir,
-    size: { width: 1440, height: 1000 },
+    size: { width: 1440, height: 1240 },
   },
 });
 
@@ -277,19 +280,50 @@ background _right after the app step that makes it possible_ and `await` the pro
 when its scene arrives — earlier scenes play while it renders, so the recording never sits
 in dead air waiting for it.
 
-## Callout Banners
+## Standard Look
 
-Use short in-video callout banners when they make the walkthrough easier to understand.
+Every walkthrough video has these three elements. They are the house style, not options.
+The reference video is `~/ui-walkthroughs/SOL-4224/`.
 
-- Use 1-5 callouts per video.
-- Keep each callout under 120 characters when practical.
+1. **Title card.** The first 3 seconds are a dark card: the ticket or PR id in orange, the
+   change as a heading, and 2 to 3 lines that say what the change is and what the viewer
+   will see. Name a feature flag here if the flow depends on one.
+2. **Caption bar.** A dark 64px bar sits above the app frame for the whole video and says
+   what is happening now. It is stacked on top of the frame, so it never covers the UI.
+   Caption text is `<step> · <what is on screen>`, for example
+   `3. Boost module ON · Boost is now a payment type`. The step part is drawn in orange.
+   Change the caption each time the viewer should look at something new.
+3. **Orange cursor.** A semi-transparent orange dot shows where the pointer is and shrinks
+   on a click. Playwright video has no OS cursor, so without it the viewer cannot see where
+   a click lands. Move the pointer to the target before each click.
+
+Two scripts in this skill's `scripts/` folder produce all three. Copy both into the
+walkthrough's `scripts/` dir and use them; do not write new ones.
+
+- `walkthrough-kit.mjs` (record side): `installCursor(context)` draws the cursor.
+  `startTake(page)` gives `caption(text)`, `cutStart()` / `cutEnd()` for ranges to trim
+  (page loads, setup clicks), `click` and `type` helpers that move the cursor first, and
+  `finish({ takesDir, name })`, which writes `<name>.webm` and `<name>.marks.json`.
+- `build-walkthrough.mjs` (build side): joins the takes, removes the cut ranges, stacks the
+  caption bar, prepends the title card, and writes the mp4 and a `.chapters.txt` file.
+
+```bash
+node build-walkthrough.mjs --base ~/ui-walkthroughs/<ticket-or-pr> --out <ticket-or-pr>-<flow-slug>.mp4 \
+  --viewport 1440x1240 --kicker <ticket-or-pr> --title "<the change>" \
+  --summary "<what it is>|<what the viewer will see>" <take> [<take> ...]
+```
+
+The output is `--viewport` plus 64px of height for the bar, so record at the same viewport
+you pass here. Record in more than one take when state must change between scenes (a flag,
+a fresh page load); the build joins them in the order given.
+
+Rules for caption and title text:
+
+- Keep each caption under 120 characters. It must fit on one line of the bar.
 - Describe only the visible product behavior, user action, or state transition being demonstrated.
 - Do not mention recording mechanics, auth setup, skipped login, seeded sessions, Playwright, test harnesses, implementation details, or anything relevant only to how the video was made.
-- Default callouts to the top-right of the viewport, for example `top: 24px; right: 24px`, so they do not sit behind video playback controls or bottom action bars.
-- Avoid bottom-left and bottom-right callouts unless the changed UI makes the top-right placement worse.
-- Place callouts where they do not cover the changed UI, active menus, dialogs, form fields, table rows, buttons, toasts, or error/success states.
-- Before finalizing, inspect at least one frame per callout placement. If callouts cover important UI, re-record with better placement.
-- Do not add callouts by modifying app source. Inject them only in the browser session.
+- Do not add captions or the cursor by modifying app source. The cursor is injected only in the browser session, and the bar and title card are added at build time.
+- Before finalizing, inspect the title card and at least one frame per caption. Re-record if a caption is clipped or does not match what is on screen.
 
 ## Recording Standards
 
@@ -301,7 +335,7 @@ Use short in-video callout banners when they make the walkthrough easier to unde
 - Name files predictably under the persistent base (see "Where Artifacts Live"): videos `~/ui-walkthroughs/<ticket-or-pr>/<ticket-or-pr>-<flow-slug>.webm` / `.mp4`, and the script `~/ui-walkthroughs/<ticket-or-pr>/scripts/<ticket-or-pr>-<flow-slug>.record.mjs`.
 - Verify each video is nonblank and includes the expected UI by extracting preview frames.
 
-Standard MP4 conversion:
+Build the final mp4 with `build-walkthrough.mjs` (see "Standard Look"). For a raw take without the standard look, the plain conversion is:
 
 ```bash
 ffmpeg -y \
