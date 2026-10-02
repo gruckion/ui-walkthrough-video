@@ -7,6 +7,10 @@ description: Produce one or more end-to-end UI walkthrough demo videos for a pul
 
 Create short, task-specific UI walkthrough video artifact(s) that show exactly what changed in the real application, from entry point through completion.
 
+Check narration availability before planning the video: when `ELEVENLABS_API_KEY` is set,
+produce a narrated walkthrough by default using the workflow below. When it is absent,
+produce the usual voiceless walkthrough. Honor an explicit request for a voiceless video.
+
 ## Non-Negotiable Rule
 
 The video(s) must show the real application flow(s) on the changed branch. Do not substitute demo routes, prototype pages, component harnesses, mocked auth, mocked API responses, or hand-written fixture data for the real app experience a reviewer/customer would naturally reach.
@@ -324,6 +328,25 @@ Rules for caption and title text:
 - Do not mention recording mechanics, auth setup, skipped login, seeded sessions, Playwright, test harnesses, implementation details, or anything relevant only to how the video was made.
 - Do not add captions or the cursor by modifying app source. The cursor is injected only in the browser session, and the bar and title card are added at build time.
 - Before finalizing, inspect the title card and at least one frame per caption. Re-record if a caption is clipped or does not match what is on screen.
+
+## Narrated walkthroughs
+
+Check for a nonempty `ELEVENLABS_API_KEY` in the generation process environment. For zsh
+setups, load `~/.zshrc` through an interactive zsh before checking, without printing the
+key. If no key is set, finish and deliver the voiceless video without opening credential
+setup or asking for a key. If a key is set and the user has not requested a voiceless video,
+use [elevenlabs-narration](../elevenlabs-narration/SKILL.md) after building the final MP4.
+
+Use Charlie (`IKne3meq5aSn9XLyUdCD`) by default. An explicit user voice/model choice takes
+priority, then `ELEVENLABS_VOICE_ID` / `ELEVENLABS_MODEL_ID`, then the narration skill's
+defaults. Save the resolved voice and model in the timed narration plan.
+
+For an existing demo, reuse its local video and chapter/build timings. Save the timed
+narration plan and copied helper beside the recording script, and produce a separate
+`*-narrated.mp4`. Check every spoken line against the visible scene and listen to the
+result before delivering or attaching the narrated output. Keep the title, captions and
+cursor. If generation fails, retain the voiceless source and report the actual blocker;
+do not describe or attach it as a successfully narrated video.
 
 ## Recording Standards
 

@@ -1,3 +1,0 @@
-display_name: UI Walkthrough Video
-short_description: Produce real-app UI demo videos for PRs, issues, tickets, and local changes.
-default_prompt: Create a short walkthrough video for this UI change in the actual application only. Derive the real route and user path from the ticket and diff, delegate independent discovery and verification work where available, run the changed branch with the real frontend/backend and app-supported data, authenticate as a real seeded or documented test user, record the changed flow, verify the video, and return the video path plus what it proves. If auth/data/backend/setup blocks the real app flow, report the blocker instead of making a mock account, mocked API, demo route, or component-level substitute.
