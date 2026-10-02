@@ -1,0 +1,4 @@
+interface:
+  display_name: "UI Walkthrough Video"
+  short_description: "Record real-app walkthroughs with optional narration"
+  default_prompt: "Use $ui-walkthrough-video to record and verify the changed flow in the real application, with narration when ELEVENLABS_API_KEY is set."
