@@ -7,9 +7,8 @@ description: Produce one or more end-to-end UI walkthrough demo videos for a pul
 
 Create short, task-specific UI walkthrough video artifact(s) that show exactly what changed in the real application, from entry point through completion.
 
-Check narration availability before planning the video: when `ELEVENLABS_API_KEY` is set,
-produce a narrated walkthrough by default using the workflow below. When it is absent,
-produce the usual voiceless walkthrough. Honor an explicit request for a voiceless video.
+Narrate the walkthrough by default with the local Kokoro voice (see "Narrated walkthroughs").
+It needs no account or key. Honor an explicit request for a voiceless video.
 
 ## Non-Negotiable Rule
 
@@ -34,14 +33,17 @@ Base (repo- and agent-independent): `~/ui-walkthroughs/<ticket-or-pr>/`
   scripts/walkthrough-kit.ts                     # copied from this skill: cursor, captions, cut marks
   scripts/build-walkthrough.ts                   # copied from this skill: title card, caption bar, join
   takes/<take>.webm + <take>.marks.json           # raw takes (regenerable)
-  scripts/package.json                            # pins playwright
+  scripts/package.json                            # pins playwright, and koffi for Kokoro narration
+  scripts/narrate-video.ts + its siblings         # copied from the narration skill
+  narration-cache/                                # spoken lines by hash, reused across rebuilds
   seed/<ticket-or-pr>.dump                        # demo DB snapshot + a note on how it was made
 ```
 
 The scripts are TypeScript and run with plain Node, which strips the types: `node scripts/<name>.ts`.
 This needs Node 22.18 or newer. Use only syntax that stripping can run: no `enum`, no
 `namespace`, no constructor parameter properties, and `import type` for type-only imports.
-Import sibling scripts with their `.ts` extension.
+Import sibling scripts with their `.ts` extension. Give `scripts/package.json` `"type": "module"`,
+or Node warns on every run. Use pnpm for the scripts' dependencies.
 
 The **script is the durable asset; the video is a regenerable output.** Persist the script,
 auth setup, and seed here the moment they work — do not leave them in the scratchpad, even
@@ -357,22 +359,20 @@ Rules for caption, title, callout and narration text:
 
 ## Narrated walkthroughs
 
-Check for a nonempty `ELEVENLABS_API_KEY` in the generation process environment. For zsh
-setups, load `~/.zshrc` through an interactive zsh before checking, without printing the
-key. If no key is set, finish and deliver the voiceless video without opening credential
-setup or asking for a key. If a key is set and the user has not requested a voiceless video,
-use [elevenlabs-narration](../elevenlabs-narration/SKILL.md) after building the final MP4.
-
-Use Charlie (`IKne3meq5aSn9XLyUdCD`) by default. An explicit user voice/model choice takes
-priority, then `ELEVENLABS_VOICE_ID` / `ELEVENLABS_MODEL_ID`, then the narration skill's
-defaults. Save the resolved voice and model in the timed narration plan.
+Unless the user asked for a voiceless video, use [narration](../narration/SKILL.md) after
+building the final MP4. Use Kokoro, the local voice, with `am_liam` at speed 1 by default.
+Use ElevenLabs only when the user asks for it; it needs `ELEVENLABS_API_KEY`, and for zsh
+setups, load `~/.zshrc` through an interactive zsh before checking, without printing the key.
+An explicit user voice or setting takes priority over the defaults. Save the resolved
+provider, voice and settings in the timed narration plan.
 
 For an existing demo, reuse its local video and chapter/build timings. Save the timed
-narration plan and copied helper beside the recording script, and produce a separate
-`*-narrated.mp4`. Check every spoken line against the visible scene and listen to the
-result before delivering or attaching the narrated output. Keep the title, captions and
-cursor. If generation fails, retain the voiceless source and report the actual blocker;
-do not describe or attach it as a successfully narrated video.
+narration plan and the copied narration scripts beside the recording script, and produce a
+separate `*-narrated.mp4`. Keep the clip cache (`narration-cache/`) so a rebuild only
+generates the lines that changed. Check every spoken line against the visible scene and
+listen to the result before delivering or attaching the narrated output. Keep the title,
+captions and cursor. If generation fails, retain the voiceless source and report the actual
+blocker; do not describe or attach it as a successfully narrated video.
 
 ## Recording Standards
 

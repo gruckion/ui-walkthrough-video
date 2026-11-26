@@ -1,0 +1,3 @@
+interface:
+  display_name: "Narration"
+  short_description: "Add timed voiceovers to demo videos with a local or ElevenLabs voice"
