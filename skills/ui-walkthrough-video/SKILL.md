@@ -103,6 +103,13 @@ If subagents are unavailable, follow the same lane structure yourself without st
    - Prefer Playwright `recordVideo` when available. Use a reliable browser screenshot-to-MP4 path only when Playwright recording is unavailable or impractical in the current environment.
    - Capture at a readable viewport, usually desktop first unless the PR is mobile-specific. Default to 1440x1240: a shorter window puts the last block of the page under any fixed bottom bar, and scrolling cannot clear it.
    - Use deliberate pauses after each changed interaction.
+   - **Every step proves its claim, or the take fails.** The video is evidence that the feature works, so each step must be able to show that it does not.
+     1. Before scripting a step, write the claim its caption makes and the visible outcome that only a working feature produces (what appears, disappears, changes number or text).
+     2. Choose data and inputs where a broken feature would look different on screen. If the outcome could already be on screen before the action, change the data or the step.
+     3. Assert that outcome in the script after the action: the change itself, not only that some target element exists. Read back any text the caption relies on (counts, messages, totals) and check it is true for the input used.
+     4. If the outcome does not happen, the feature is broken: stop, report it as a product defect, and do not record around it.
+     - Example of the failure this prevents: a search step typed "Palmer" and waited for the Palmer row, which was already on page 1, so the step passed while the search filtered nothing ("1–10 of 15" never changed). The step should pick a match that is not on the first page and assert that the other rows disappear and the count changes.
+     - Another: a validation step entered 400 days and asserted only that Save turned off, while the field said "A whole number of days", which is false for 400. Assert the exact message and that it fits the value.
    - If the first capture has a wrong click, missed menu, blank page, or unclear caption, recapture rather than handing over a flawed artifact.
 
 6. **Encode and verify**
@@ -336,6 +343,9 @@ Rules for caption, title, callout and narration text:
 - State only what the change does now. No asides to colleagues ("that's a question for Paul"), open questions, or hints of work nobody agreed to ("no slip yet"). Those belong in the chat or the PR discussion, not in a video a stakeholder watches.
 - Do not add captions or the cursor by modifying app source. The cursor is injected only in the browser session, and the bar and title card are added at build time.
 - Before finalizing, inspect the title card and at least one frame per caption. Re-record if a caption is clipped or does not match what is on screen.
+- **Frame-per-caption review.** Extract a frame at the end of each caption's time span, not at fixed intervals. For each one, write down what the screen shows next to what the caption and narration claim (the count, the filtered rows, the message text, the result). Any mismatch is a defect in the feature or the video.
+- Treat odd rendering (clipped first letters, overlapping columns, cut-off text, wrong counts) as a product defect until proven otherwise. Do not explain it away as a scaling artifact.
+- Write the narration from the frames you observed, never from the recording script.
 
 ## Narrated walkthroughs
 
@@ -441,7 +451,7 @@ Using this demo checklist, draft a short recording plan with captions. Return or
 **Verification**
 
 ```text
-Inspect the generated video and representative frames at <paths>. Return whether the walkthrough matches the demo checklist, and call out any wrong clicks, missing steps, unreadable captions, blank screens, or visual issues.
+Inspect the generated video at <paths>. Extract one frame at the end of each caption's time span (timings in <chapters/narration file>). For each caption, report what the frame shows against what the caption and narration claim: counts, filtered rows, exact error text, saved results. Call out any wrong clicks, missing steps, unreadable captions, blank screens, clipped text, or a feature that did not do what the caption says. Treat odd rendering as a defect, not a scaling artifact.
 ```
 
 ## Blockers
