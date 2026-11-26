@@ -68,7 +68,7 @@ Each clip is named by a hash of its provider, model, voice, settings and text, a
 Copy every file in [scripts/](scripts/) into the walkthrough's `scripts/` directory so that future rebuilds stay portable, and add `koffi` 3.3.6 to that directory's `package.json` (Kokoro loads audio.cpp through it). That `package.json` needs `"type": "module"`, or Node warns on every run:
 
 ```sh
-cd ~/ui-walkthroughs/<ticket-or-pr>/scripts && npm pkg set type=module && npm install --save-exact koffi@3.3.6
+cd ~/ui-walkthroughs/<ticket-or-pr>/scripts && pnpm add --save-exact koffi@3.3.6
 node narrate-video.ts --video ../demo.mp4 --plan demo.narration.json --out ../demo-narrated.mp4 --dry-run
 node narrate-video.ts --video ../demo.mp4 --plan demo.narration.json --out ../demo-narrated.mp4
 ```

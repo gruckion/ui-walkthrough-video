@@ -42,8 +42,8 @@ Base (repo- and agent-independent): `~/ui-walkthroughs/<ticket-or-pr>/`
 The scripts are TypeScript and run with plain Node, which strips the types: `node scripts/<name>.ts`.
 This needs Node 22.18 or newer. Use only syntax that stripping can run: no `enum`, no
 `namespace`, no constructor parameter properties, and `import type` for type-only imports.
-Import sibling scripts with their `.ts` extension. Give `scripts/package.json` `"type": "module"`
-(`npm pkg set type=module`), or Node warns on every run.
+Import sibling scripts with their `.ts` extension. Give `scripts/package.json` `"type": "module"`,
+or Node warns on every run. Use pnpm for the scripts' dependencies.
 
 The **script is the durable asset; the video is a regenerable output.** Persist the script,
 auth setup, and seed here the moment they work — do not leave them in the scratchpad, even

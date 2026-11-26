@@ -69,8 +69,8 @@ The links point to the checkout, so pulling updates updates both installed skill
 The helpers in `skills/*/scripts/` are TypeScript. To type-check them:
 
 ```bash
-npm install
-npm run typecheck
+pnpm install
+pnpm typecheck
 ```
 
 `tsconfig.json` allows only syntax that Node's type stripping can run unchanged.
