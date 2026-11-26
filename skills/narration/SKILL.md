@@ -12,7 +12,7 @@ Add a voiceover to the final edited video, preserving its visual track and savin
 Two providers. The plan's `provider` picks one; Kokoro is the default.
 
 - **Kokoro** (`"provider": "kokoro"`): an open 82M-parameter model that runs on this machine through audio.cpp. No account, key or cost. The first run downloads the model, its eSpeak data and the audio.cpp library (about 225 MB on macOS) into `~/.cache/ui-walkthrough-video/kokoro/`, and checks each file's SHA-256. When T3 Code has already installed the same files in `~/.t3/userdata/speech/`, those are used instead. Builds exist for macOS (Apple silicon and Intel), Linux and Windows on x64 and arm64.
-  - `voice`: default `af_heart`. The first letter is the accent or language (`a` American English, `b` British English, `e` Spanish, `f` French, `h` Hindi, `i` Italian, `p` Brazilian Portuguese), the second is `f` or `m`. For example `am_michael`, `bf_emma`, `bm_george`. The script lists every voice when given an unknown one.
+  - `voice`: default `am_liam`. The first letter is the accent or language (`a` American English, `b` British English, `e` Spanish, `f` French, `h` Hindi, `i` Italian, `p` Brazilian Portuguese), the second is `f` or `m`. For example `af_heart`, `bf_emma`, `bm_george`. The script lists every voice when given an unknown one.
   - `speed`: default 1, from 0.5 to 2. The model itself speaks faster or slower.
   - `language`: optional; the voice's language is used otherwise.
 - **ElevenLabs** (`"provider": "elevenlabs"`): hosted, billed per character, needs `ELEVENLABS_API_KEY`. Use it only when the user asks for it.
@@ -35,7 +35,7 @@ Example plans:
 ```json
 {
   "provider": "kokoro",
-  "voice": "af_heart",
+  "voice": "am_liam",
   "speed": 1,
   "segments": [
     { "start": 3.15, "end": 6.0, "text": "Every add-on has its own price." },

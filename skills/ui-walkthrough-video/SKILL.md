@@ -360,7 +360,7 @@ Rules for caption, title, callout and narration text:
 ## Narrated walkthroughs
 
 Unless the user asked for a voiceless video, use [narration](../narration/SKILL.md) after
-building the final MP4. Use Kokoro, the local voice, with `af_heart` at speed 1 by default.
+building the final MP4. Use Kokoro, the local voice, with `am_liam` at speed 1 by default.
 Use ElevenLabs only when the user asks for it; it needs `ELEVENLABS_API_KEY`, and for zsh
 setups, load `~/.zshrc` through an interactive zsh before checking, without printing the key.
 An explicit user voice or setting takes priority over the defaults. Save the resolved

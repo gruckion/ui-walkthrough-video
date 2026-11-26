@@ -41,7 +41,7 @@ Install the required tools separately. API keys and app credentials belong in ea
 
 ## Voices
 
-**Kokoro (default)** needs no setup. The first narration downloads the model, its eSpeak data and the audio.cpp library (about 225 MB on macOS) into `~/.cache/ui-walkthrough-video/kokoro/` and checks each file's SHA-256. If [T3 Code](https://github.com/pingdotgg/t3code) has already downloaded the same files, they are reused. Builds exist for macOS, Linux and Windows on x64 and arm64. The default voice is `af_heart`; the [narration skill](skills/narration/SKILL.md) lists the others.
+**Kokoro (default)** needs no setup. The first narration downloads the model, its eSpeak data and the audio.cpp library (about 225 MB on macOS) into `~/.cache/ui-walkthrough-video/kokoro/` and checks each file's SHA-256. If [T3 Code](https://github.com/pingdotgg/t3code) has already downloaded the same files, they are reused. Builds exist for macOS, Linux and Windows on x64 and arm64. The default voice is `am_liam`; the [narration skill](skills/narration/SKILL.md) lists the others.
 
 **ElevenLabs (on request)** needs your own key. Create one in the [ElevenLabs API-key dashboard](https://elevenlabs.io/app/developers/api-keys) with Text to Speech access. Keys are never part of this repository or installer. For zsh, add these exports to `~/.zshrc` and open a new shell:
 

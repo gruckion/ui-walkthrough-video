@@ -45,7 +45,7 @@ const KOKORO_MODEL: Asset = {
 };
 
 export const KOKORO_MODEL_ID = 'kokoro-82m';
-export const KOKORO_DEFAULT_VOICE = 'af_heart';
+export const KOKORO_DEFAULT_VOICE = 'am_liam';
 // The first letter is the accent or language (a: American English, b: British English, e: Spanish,
 // f: French, h: Hindi, i: Italian, p: Brazilian Portuguese); the second is f (female) or m (male).
 export const KOKORO_VOICES: readonly string[] = [
