@@ -103,7 +103,9 @@ pieces.forEach((p, i) => {
 });
 const list = path.join(WORK, 'list.txt');
 fs.writeFileSync(list, files.map((f) => `file '${f}'`).join('\n'));
-ff(['-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', '-movflags', '+faststart', OUT]);
+// Re-encode the join: the title card and the takes carry different H.264 parameter sets, and
+// QuickTime decodes a stream-copied join with the first one only, freezing on the title card.
+ff(['-f', 'concat', '-safe', '0', '-i', list, ...enc, '-movflags', '+faststart', OUT]);
 const mmss = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 const chapterText = ['0:00 Title', ...chapters.map((c) => `${mmss(c.t)} ${c.text}`)].join('\n') + '\n';
 fs.writeFileSync(OUT.replace(/\.mp4$/, '.chapters.txt'), chapterText);
