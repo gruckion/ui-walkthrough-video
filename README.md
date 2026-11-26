@@ -31,7 +31,7 @@ Or invoke `ui-walkthrough-video` or `elevenlabs-narration` by name in your agent
 
 ## Requirements
 
-- Node.js 18 or newer for the bundled helpers.
+- Node.js 22.18 or newer for the bundled helpers. They are TypeScript files that Node runs directly, with no build step.
 - Playwright with a Chromium browser for recording; use the application's existing installation when available.
 - `ffmpeg` and `ffprobe` for encoding, narration and verification.
 - A locally runnable app with documented authentication and app-supported seed/test data.
@@ -63,3 +63,14 @@ git -C ~/developer-tools/ui-walkthrough-video pull --ff-only
 ```
 
 The links point to the checkout, so pulling updates updates both installed skills. Rerun the installer if you move the checkout or add an installation for another agent.
+
+## Developing the helpers
+
+The helpers in `skills/*/scripts/` are TypeScript. To type-check them:
+
+```bash
+npm install
+npm run typecheck
+```
+
+`tsconfig.json` allows only syntax that Node's type stripping can run unchanged.
