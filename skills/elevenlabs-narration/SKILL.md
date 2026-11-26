@@ -5,7 +5,7 @@ description: Generate ElevenLabs speech and synchronize it with an existing vide
 
 # ElevenLabs narration
 
-Add a voiceover to the final edited video, preserving its visual track and saving a separate narrated MP4. Use Node, ffmpeg and ffprobe with [scripts/narrate-video.mjs](scripts/narrate-video.mjs); it caches speech, checks scene fit and muxes AAC audio into the video.
+Add a voiceover to the final edited video, preserving its visual track and saving a separate narrated MP4. Use Node, ffmpeg and ffprobe with [scripts/narrate-video.ts](scripts/narrate-video.ts); it caches speech, checks scene fit and muxes AAC audio into the video.
 
 ## Credentials and voice
 
@@ -37,8 +37,8 @@ Example plan:
 Copy the helper into the walkthrough's `scripts/` directory so that future rebuilds remain portable:
 
 ```sh
-node scripts/narrate-video.mjs --video demo.mp4 --plan scripts/demo.narration.json --out demo-narrated.mp4 --dry-run
-node scripts/narrate-video.mjs --video demo.mp4 --plan scripts/demo.narration.json --out demo-narrated.mp4
+node scripts/narrate-video.ts --video demo.mp4 --plan scripts/demo.narration.json --out demo-narrated.mp4 --dry-run
+node scripts/narrate-video.ts --video demo.mp4 --plan scripts/demo.narration.json --out demo-narrated.mp4
 ```
 
 ## Delivery controls

@@ -1,11 +1,11 @@
 // Record-side helpers for the standard walkthrough look: a visible cursor, and the
-// caption / cut marks that build-walkthrough.mjs turns into the caption bar.
+// caption / cut marks that build-walkthrough.ts turns into the caption bar.
 //
 // COPY this file into the walkthrough's `scripts/` dir (next to the record script)
 // and import it; do not reference it from the skill folder, which may move.
 //
 // Usage inside a record script:
-//   import { installCursor, startTake } from './walkthrough-kit.mjs';
+//   import { installCursor, startTake } from './walkthrough-kit.ts';
 //   const context = await browser.newContext({ viewport, storageState, recordVideo: { dir: takesDir, size: viewport } });
 //   await installCursor(context);                       // before newPage()
 //   const page = await context.newPage();
@@ -17,9 +17,19 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import type { BrowserContext, Locator, Page } from 'playwright';
+
+export type Caption = { readonly t: number; readonly text: string };
+export type Cut = readonly [from: number, to: number];
+/** Seconds from the start of a take, written beside its video as `<take>.marks.json`. */
+export type TakeMarks = {
+  readonly captions: Caption[];
+  readonly cuts: Cut[];
+  end?: number;
+};
 
 // Playwright video has no OS cursor, so draw one. Orange, semi-transparent, shrinks on click.
-export async function installCursor(context) {
+export async function installCursor(context: BrowserContext): Promise<void> {
   await context.addInitScript(() => {
     const make = () => {
       if (document.getElementById('wt-cursor')) return;
@@ -32,7 +42,7 @@ export async function installCursor(context) {
       });
       document.documentElement.appendChild(c);
       let x = -100, y = -100;
-      const put = (s) => { c.style.transform = `translate(${x}px,${y}px) scale(${s})`; };
+      const put = (s: number) => { c.style.transform = `translate(${x}px,${y}px) scale(${s})`; };
       window.addEventListener('mousemove', (e) => { x = e.clientX; y = e.clientY; put(1); }, true);
       window.addEventListener('mousedown', () => put(0.6), true);
       window.addEventListener('mouseup', () => put(1), true);
@@ -41,31 +51,33 @@ export async function installCursor(context) {
   });
 }
 
-export function startTake(page) {
+export function startTake(page: Page) {
   const t0 = Date.now();
-  const marks = { captions: [], cuts: [] };
+  const marks: TakeMarks = { captions: [], cuts: [] };
   const now = () => (Date.now() - t0) / 1000;
-  let cutFrom = null;
-  const pause = (ms) => page.waitForTimeout(ms);
+  let cutFrom: number | null = null;
+  const pause = (ms: number) => page.waitForTimeout(ms);
 
   // Move the cursor to the target first, so the viewer sees where the click lands.
-  async function click(locator, { after = 700 } = {}) {
+  async function click(locator: Locator, { after = 700 }: { readonly after?: number } = {}) {
     await locator.waitFor();
     const box = await locator.boundingBox();
+    if (!box) throw new Error('The click target is not visible, so the cursor cannot move to it');
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 18 });
     await pause(350);
     await locator.click();
     await pause(after);
   }
-  async function type(locator, text) {
+  async function type(locator: Locator, text: string) {
     await click(locator, { after: 200 });
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.type(text, { delay: 70 });
     await pause(500);
   }
-  async function finish({ takesDir, name }) {
+  async function finish({ takesDir, name }: { readonly takesDir: string; readonly name: string }) {
     marks.end = now();
     const video = page.video();
+    if (!video) throw new Error('This page is not recording: create its context with recordVideo');
     const context = page.context();
     await page.close();
     await context.close();
@@ -74,8 +86,12 @@ export function startTake(page) {
   }
   return {
     marks, now, pause, click, type, finish,
-    caption: (text) => marks.captions.push({ t: now(), text }),
+    caption: (text: string) => { marks.captions.push({ t: now(), text }); },
     cutStart: () => { cutFrom = now(); },
-    cutEnd: () => { marks.cuts.push([cutFrom, now()]); cutFrom = null; },
+    cutEnd: () => {
+      if (cutFrom === null) throw new Error('cutEnd() needs a cutStart() first');
+      marks.cuts.push([cutFrom, now()]);
+      cutFrom = null;
+    },
   };
 }

@@ -1,0 +1,17 @@
+{
+  "name": "ui-walkthrough-video",
+  "private": true,
+  "type": "module",
+  "description": "Type checking for the bundled skill scripts. The scripts run with plain Node and need no build.",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.4",
+    "playwright": "1.65.1",
+    "typescript": "7.0.2"
+  }
+}

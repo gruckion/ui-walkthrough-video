@@ -9,7 +9,7 @@
 // and import it — do not reference it from the skill folder, which may move.
 //
 // Usage inside a record script:
-//   import { showPdfInterstitial } from './pdf-interstitial.mjs';
+//   import { showPdfInterstitial } from './pdf-interstitial.ts';
 //   await showPdfInterstitial(page, {
 //     pdfPath: '/abs/path/take-invoice.pdf',   // the REAL artifact, fetched mid-take
 //     title: 'Invoice PDF — as the customer receives it',
@@ -21,10 +21,15 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import type { Page } from 'playwright';
 
 /** Convert one page of a PDF to PNG. Prefers poppler's pdftoppm; falls back to
  *  macOS `sips` (first page only). Returns the PNG path. */
-export function pdfToPng(pdfPath, outPngBase, { dpi = 110, page = 1 } = {}) {
+export function pdfToPng(
+  pdfPath: string,
+  outPngBase: string,
+  { dpi = 110, page = 1 }: { readonly dpi?: number; readonly page?: number } = {},
+): string {
   const pngPath = `${outPngBase}.png`;
   try {
     execFileSync('pdftoppm', [
@@ -39,13 +44,23 @@ export function pdfToPng(pdfPath, outPngBase, { dpi = 110, page = 1 } = {}) {
   }
 }
 
+export type PdfInterstitialOptions = {
+  readonly pdfPath: string;
+  readonly title: string;
+  readonly callout?: string;
+  readonly dwellMs?: number;
+  readonly workDir: string;
+  readonly pdfPage?: number;
+  readonly dpi?: number;
+};
+
 /** Display the PDF in the recorded page below a header bar holding the title and an
  *  optional callout line, for `dwellMs`. Nothing is drawn over the document: text on top
  *  of it reads as part of the document. The caller navigates back afterwards. */
 export async function showPdfInterstitial(
-  page,
-  { pdfPath, title, callout, dwellMs = 5000, workDir, pdfPage = 1, dpi = 110 },
-) {
+  page: Page,
+  { pdfPath, title, callout, dwellMs = 5000, workDir, pdfPage = 1, dpi = 110 }: PdfInterstitialOptions,
+): Promise<string> {
   const base = path.join(workDir, path.basename(pdfPath).replace(/\.pdf$/i, ''));
   const pngPath = pdfToPng(pdfPath, base, { dpi, page: pdfPage });
 
@@ -69,6 +84,8 @@ export async function showPdfInterstitial(
   return pngPath;
 }
 
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const HTML_ESCAPES: Readonly<Record<string, string>> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c] ?? c);
 }

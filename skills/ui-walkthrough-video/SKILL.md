@@ -29,14 +29,19 @@ Base (repo- and agent-independent): `~/ui-walkthroughs/<ticket-or-pr>/`
 ```
 ~/ui-walkthroughs/<ticket-or-pr>/
   <ticket-or-pr>-<flow-slug>.mp4 / .webm          # video outputs (regenerable)
-  scripts/<ticket-or-pr>-<flow-slug>.record.mjs   # the recording script — the durable source of truth
-  scripts/auth-setup.mjs                          # out-of-frame login that persists storageState
-  scripts/walkthrough-kit.mjs                     # copied from this skill: cursor, captions, cut marks
-  scripts/build-walkthrough.mjs                   # copied from this skill: title card, caption bar, join
+  scripts/<ticket-or-pr>-<flow-slug>.record.ts   # the recording script — the durable source of truth
+  scripts/auth-setup.ts                          # out-of-frame login that persists storageState
+  scripts/walkthrough-kit.ts                     # copied from this skill: cursor, captions, cut marks
+  scripts/build-walkthrough.ts                   # copied from this skill: title card, caption bar, join
   takes/<take>.webm + <take>.marks.json           # raw takes (regenerable)
   scripts/package.json                            # pins playwright
   seed/<ticket-or-pr>.dump                        # demo DB snapshot + a note on how it was made
 ```
+
+The scripts are TypeScript and run with plain Node, which strips the types: `node scripts/<name>.ts`.
+This needs Node 22.18 or newer. Use only syntax that stripping can run: no `enum`, no
+`namespace`, no constructor parameter properties, and `import type` for type-only imports.
+Import sibling scripts with their `.ts` extension.
 
 The **script is the durable asset; the video is a regenerable output.** Persist the script,
 auth setup, and seed here the moment they work — do not leave them in the scratchpad, even
@@ -44,9 +49,9 @@ mid-task. Do NOT hardcode a repo path (e.g. a specific worktree) as the base: wo
 temporary and vanish on cleanup, and the path differs per user.
 
 **Re-recording an existing target — check here first.** Before writing any script,
-`ls ~/ui-walkthroughs/<ticket-or-pr>/scripts/` and update the existing `.record.mjs` instead
+`ls ~/ui-walkthroughs/<ticket-or-pr>/scripts/` and update the existing `.record.ts` instead
 of rewriting from scratch. Use that deterministic listing, never a fuzzy `find` by feature
-keyword — a keyword search misses a generically-named script (`record.mjs`, `record1.js`) and
+keyword — a keyword search misses a generically-named script (`record.ts`, `record1.js`) and
 reports a false "no prior script exists", wasting a full rewrite.
 
 ## Fast Workflow
@@ -73,7 +78,7 @@ If subagents are unavailable, follow the same lane structure yourself without st
    - **Derive scope mechanically from the diff, not from memory or the PR text.** Compute the actual change set: `git diff <base>...HEAD` **plus uncommitted work** (`git status --short`, `git diff`, `git diff --staged`) — work is often not committed yet. Every changed user-visible file is a candidate surface.
    - Read enough changed code to know the user-visible feature surface.
    - Decide whether one video is enough. Create multiple videos only when the feature has distinct flows that would make one video confusing.
-   - **If re-recording an existing target, `ls ~/ui-walkthroughs/<ticket-or-pr>/scripts/` and reuse/update the prior `.record.mjs`** rather than rewriting (see "Where Artifacts Live"). Re-derive the demo scope from the diff, but start from the existing script.
+   - **If re-recording an existing target, `ls ~/ui-walkthroughs/<ticket-or-pr>/scripts/` and reuse/update the prior `.record.ts`** rather than rewriting (see "Where Artifacts Live"). Re-derive the demo scope from the diff, but start from the existing script.
 
 2. **Run the app**
    - Start required backend/frontend services using existing repo scripts.
@@ -185,14 +190,17 @@ Minimal pattern:
 
 ```ts
 import { chromium } from "@playwright/test";
+import os from "node:os";
 import path from "node:path";
 
+const required = (name: string): string => {
+  const value = process.env[name];
+  if (!value) throw new Error(`Set ${name} before recording`);
+  return value;
+};
+
 // Persistent, agent-agnostic base — see "Where Artifacts Live". Never the scratchpad.
-const baseDir = path.join(
-  process.env.HOME,
-  "ui-walkthroughs",
-  "<pr-or-ticket>",
-);
+const baseDir = path.join(os.homedir(), "ui-walkthroughs", "<pr-or-ticket>");
 const webmPath = path.join(baseDir, "<pr-or-ticket>-<flow-slug>.webm");
 const authFile = path.join(baseDir, "scripts", "auth-state.json");
 const outDir = baseDir;
@@ -205,8 +213,8 @@ const setup = await browser.newContext({
 });
 const setupPage = await setup.newPage();
 await setupPage.goto(process.env.LOGIN_URL ?? "http://localhost:3000/login");
-await setupPage.getByLabel("Email").fill(process.env.SEED_EMAIL!);
-await setupPage.getByLabel("Password").fill(process.env.SEED_PASSWORD!);
+await setupPage.getByLabel("Email").fill(required("SEED_EMAIL"));
+await setupPage.getByLabel("Password").fill(required("SEED_PASSWORD"));
 await setupPage.getByRole("button", { name: "Sign in" }).click();
 await setupPage.waitForURL(
   process.env.POST_LOGIN_URL ?? "http://localhost:3000/",
@@ -266,11 +274,11 @@ the artifact therefore takes three steps, all encapsulated in the bundled helper
    title render as mojibake on `file://` pages (a real retake cause).
 
 **Use the bundled helper instead of hand-writing this.** Copy
-[scripts/pdf-interstitial.mjs](./scripts/pdf-interstitial.mjs) into the walkthrough's
+[scripts/pdf-interstitial.ts](./scripts/pdf-interstitial.ts) into the walkthrough's
 `scripts/` dir next to the record script, then:
 
 ```ts
-import { showPdfInterstitial } from "./pdf-interstitial.mjs";
+import { showPdfInterstitial } from "./pdf-interstitial.ts";
 
 // after the app step that generated the document, fetch the real bytes:
 fs.writeFileSync(
@@ -312,15 +320,15 @@ The reference video is `~/ui-walkthroughs/SOL-4224/`.
 Two scripts in this skill's `scripts/` folder produce all three. Copy both into the
 walkthrough's `scripts/` dir and use them; do not write new ones.
 
-- `walkthrough-kit.mjs` (record side): `installCursor(context)` draws the cursor.
+- `walkthrough-kit.ts` (record side): `installCursor(context)` draws the cursor.
   `startTake(page)` gives `caption(text)`, `cutStart()` / `cutEnd()` for ranges to trim
   (page loads, setup clicks), `click` and `type` helpers that move the cursor first, and
   `finish({ takesDir, name })`, which writes `<name>.webm` and `<name>.marks.json`.
-- `build-walkthrough.mjs` (build side): joins the takes, removes the cut ranges, stacks the
+- `build-walkthrough.ts` (build side): joins the takes, removes the cut ranges, stacks the
   caption bar, prepends the title card, and writes the mp4 and a `.chapters.txt` file.
 
 ```bash
-node build-walkthrough.mjs --base ~/ui-walkthroughs/<ticket-or-pr> --out <ticket-or-pr>-<flow-slug>.mp4 \
+node build-walkthrough.ts --base ~/ui-walkthroughs/<ticket-or-pr> --out <ticket-or-pr>-<flow-slug>.mp4 \
   --viewport 1440x1240 --kicker <ticket-or-pr> --title "<the change>" \
   --summary "<what it is>|<what the viewer will see>" <take> [<take> ...]
 ```
@@ -373,10 +381,10 @@ do not describe or attach it as a successfully narrated video.
 - Use visible waits, hover/highlight, and short pauses around the changed UI so reviewers can see it.
 - Avoid random navigation. Every action in the video(s) must map to acceptance checks.
 - Record the final changed branch, after validation passes.
-- Name files predictably under the persistent base (see "Where Artifacts Live"): videos `~/ui-walkthroughs/<ticket-or-pr>/<ticket-or-pr>-<flow-slug>.webm` / `.mp4`, and the script `~/ui-walkthroughs/<ticket-or-pr>/scripts/<ticket-or-pr>-<flow-slug>.record.mjs`.
+- Name files predictably under the persistent base (see "Where Artifacts Live"): videos `~/ui-walkthroughs/<ticket-or-pr>/<ticket-or-pr>-<flow-slug>.webm` / `.mp4`, and the script `~/ui-walkthroughs/<ticket-or-pr>/scripts/<ticket-or-pr>-<flow-slug>.record.ts`.
 - Verify each video is nonblank and includes the expected UI by extracting preview frames.
 
-Build the final mp4 with `build-walkthrough.mjs` (see "Standard Look"). For a raw take without the standard look, the plain conversion is:
+Build the final mp4 with `build-walkthrough.ts` (see "Standard Look"). For a raw take without the standard look, the plain conversion is:
 
 ```bash
 ffmpeg -y \
