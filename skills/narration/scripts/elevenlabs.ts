@@ -1,12 +1,9 @@
 // ElevenLabs, a hosted voice. Needs ELEVENLABS_API_KEY and is billed per character.
-import type { Clip, Speaker } from './speakers.ts';
+import { isRecord, type Clip, type Speaker } from './speakers.ts';
 
 export const ELEVENLABS_DEFAULT_VOICE = 'IKne3meq5aSn9XLyUdCD'; // Charlie
 export const ELEVENLABS_DEFAULT_MODEL = 'eleven_multilingual_v2';
 const OUTPUT_FORMAT = 'mp3_44100_128';
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 export function elevenLabsSpeaker({ voice, model, voiceSettings }: {
   readonly voice: string;
@@ -19,7 +16,8 @@ export function elevenLabsSpeaker({ voice, model, voiceSettings }: {
     provider: 'elevenlabs',
     model,
     voice,
-    identity: { voice, model, output_format: OUTPUT_FORMAT, voice_settings: voiceSettings ?? null },
+    extension: 'mp3',
+    identity: { voice, model, output_format: OUTPUT_FORMAT, ...(voiceSettings ? { voice_settings: voiceSettings } : {}) },
     async speak(text, index): Promise<Clip> {
       if (/eleven_v[34]/.test(model) && /<break\b/.test(text)) throw new Error(`Segment ${index + 1}: v3/v4 use punctuation or audio tags, not SSML breaks`);
       const key = process.env.ELEVENLABS_API_KEY;
@@ -42,7 +40,6 @@ export function elevenLabsSpeaker({ voice, model, voiceSettings }: {
       if (!isRecord(result) || typeof result.audio_base64 !== 'string' || !result.audio_base64) throw new Error(`No audio returned for segment ${index + 1}`);
       return {
         bytes: Buffer.from(result.audio_base64, 'base64'),
-        extension: 'mp3',
         metadata: { request_id: response.headers.get('request-id'), alignment: result.alignment, normalized_alignment: result.normalized_alignment },
       };
     },

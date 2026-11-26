@@ -8,7 +8,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
-import { loadSpeechModel, type Audio, type SpeechModel } from './audio-cpp.ts';
+import { loadSpeechModel, type Audio, type Backend, type SpeechModel } from './audio-cpp.ts';
+import { KOKORO_MODEL_ID, kokoroSettingsProblem } from './kokoro-voices.ts';
 import type { Clip, Speaker } from './speakers.ts';
 
 // A release of github.com/pingdotgg/audio.cpp, the build T3 Code ships.
@@ -17,7 +18,7 @@ const RELEASE = `https://github.com/pingdotgg/audio.cpp/releases/download/${AUDI
 const GGUF_REVISION = '7a103b33f04120535bdfe97b5f65b79d3c90d708';
 
 type Asset = { readonly filename: string; readonly url: string; readonly size: number; readonly sha256: string };
-type Runtime = Asset & { readonly library: string; readonly backend: 'metal' | 'vulkan' | 'cpu' };
+type Runtime = Asset & { readonly library: string; readonly backend: Backend };
 
 const runtime = (name: string, size: number, sha256: string, library: string, backend: Runtime['backend']): Runtime => {
   const filename = `audio-${AUDIO_CPP_VERSION}-lib-${name}`;
@@ -44,22 +45,26 @@ const KOKORO_MODEL: Asset = {
   sha256: '9a4ca6176460cdc8c7845b804c0bbe85a4791ee3ffff568a3fdadbb708c63f47',
 };
 
-export const KOKORO_MODEL_ID = 'kokoro-82m';
-export const KOKORO_DEFAULT_VOICE = 'am_liam';
-// The first letter is the accent or language (a: American English, b: British English, e: Spanish,
-// f: French, h: Hindi, i: Italian, p: Brazilian Portuguese); the second is f (female) or m (male).
-export const KOKORO_VOICES: readonly string[] = [
-  ...['heart', 'alloy', 'aoede', 'bella', 'jessica', 'kore', 'nicole', 'nova', 'river', 'sarah', 'sky'].map((name) => `af_${name}`),
-  ...['adam', 'echo', 'eric', 'fenrir', 'liam', 'michael', 'onyx', 'puck', 'santa'].map((name) => `am_${name}`),
-  'bf_alice', 'bf_emma', 'bf_isabella', 'bf_lily', 'bm_daniel', 'bm_fable', 'bm_george', 'bm_lewis',
-  'ef_dora', 'em_alex', 'em_santa', 'ff_siwis', 'hf_alpha', 'hf_beta', 'hm_omega', 'hm_psi',
-  'if_sara', 'im_nicola', 'pf_dora', 'pm_alex', 'pm_santa',
-];
-
 const cacheRoot = () =>
   path.join(process.env.XDG_CACHE_HOME || path.join(os.homedir(), '.cache'), 'ui-walkthrough-video', 'kokoro', AUDIO_CPP_VERSION);
 // Where T3 Code installs the same files.
 const T3_SPEECH = path.join(os.homedir(), '.t3', 'userdata', 'speech');
+
+function readText(file: string): string | undefined {
+  try {
+    return fs.readFileSync(file, 'utf8').trim();
+  } catch {
+    return undefined;
+  }
+}
+
+function sizeOf(file: string): number | undefined {
+  try {
+    return fs.statSync(file).size;
+  } catch {
+    return undefined;
+  }
+}
 
 async function sha256(file: string): Promise<string> {
   const hash = createHash('sha256');
@@ -100,8 +105,10 @@ async function download(asset: Asset, destination: string): Promise<void> {
 /** A checked copy of `asset`: T3 Code's when it matches, else the cache's, downloading if needed. */
 async function file(asset: Asset, t3Name: string): Promise<string> {
   const cached = path.join(cacheRoot(), asset.filename);
+  // The marker holds the checksum the cached file passed, so a file from another release,
+  // or one damaged since, is checked again rather than trusted.
   const marker = `${cached}.verified`;
-  if (fs.existsSync(marker) && fs.existsSync(cached)) return cached;
+  if (readText(marker) === asset.sha256 && sizeOf(cached) === asset.size) return cached;
   const fromT3 = path.join(T3_SPEECH, 'models', t3Name);
   if (await matches(fromT3, asset)) return fromT3;
   if (!(await matches(cached, asset))) await download(asset, cached);
@@ -110,7 +117,7 @@ async function file(asset: Asset, t3Name: string): Promise<string> {
 }
 
 /** The audio.cpp library for this machine, unpacked from its checked release archive. */
-async function library(): Promise<{ readonly path: string; readonly backend: string }> {
+async function library(): Promise<{ readonly path: string; readonly backend: Backend }> {
   const platform = `${process.platform}-${process.arch}`;
   const release = RUNTIMES[platform];
   if (!release) throw new Error(`Kokoro narration has no audio.cpp build for ${platform}. Use the ElevenLabs provider.`);
@@ -170,8 +177,8 @@ function wav(audio: Audio): Uint8Array {
 }
 
 export function kokoroSpeaker({ voice, speed, language }: { readonly voice: string; readonly speed: number; readonly language?: string }): Speaker {
-  if (!KOKORO_VOICES.includes(voice)) throw new Error(`Unknown Kokoro voice "${voice}". Choose one of: ${KOKORO_VOICES.join(', ')}`);
-  if (!(speed >= 0.5 && speed <= 2)) throw new Error('Kokoro speed must be between 0.5 and 2');
+  const problem = kokoroSettingsProblem(voice, speed);
+  if (problem) throw new Error(problem);
   let model: SpeechModel | undefined;
   const load = async () => {
     if (model) return model;
@@ -186,11 +193,12 @@ export function kokoroSpeaker({ voice, speed, language }: { readonly voice: stri
     provider: 'kokoro',
     model: KOKORO_MODEL_ID,
     voice,
-    identity: { voice, speed, language: language ?? null, audio_cpp: AUDIO_CPP_VERSION, model_sha256: KOKORO_MODEL.sha256 },
+    extension: 'wav',
+    identity: { voice, speed, ...(language ? { language } : {}), audio_cpp: AUDIO_CPP_VERSION, model_sha256: KOKORO_MODEL.sha256 },
     async speak(text): Promise<Clip> {
       const loaded = await load();
       const audio = loaded.speak({ text, ...(language ? { language } : {}), options: { voice_id: voice, speed: String(speed) } });
-      return { bytes: wav(audio), extension: 'wav', metadata: { backend: loaded.backend, sample_rate: audio.sampleRate } };
+      return { bytes: wav(audio), metadata: { backend: loaded.backend, sample_rate: audio.sampleRate } };
     },
     close() {
       model?.dispose();

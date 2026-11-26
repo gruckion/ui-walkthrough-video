@@ -17,8 +17,11 @@ export type SpeechRequest = {
   readonly options?: Readonly<Record<string, string>>;
 };
 
+/** The session backend a build accelerates; every build can also run on the CPU. */
+export type Backend = 'metal' | 'vulkan' | 'cpu';
+
 export type SpeechModel = {
-  readonly backend: string;
+  readonly backend: Backend;
   /** All audio for `request`, joined in order. */
   readonly speak: (request: SpeechRequest) => Audio;
   readonly dispose: () => void;
@@ -28,7 +31,7 @@ export type SpeechModel = {
 export function loadSpeechModel(
   libraryPath: string,
   modelPath: string,
-  { backend, threads }: { readonly backend: string; readonly threads: number },
+  { backend, threads }: { readonly backend: Backend; readonly threads: number },
 ): SpeechModel {
   const lib = koffi.load(libraryPath);
   const Registry = koffi.pointer(koffi.opaque());
@@ -80,13 +83,13 @@ export function loadSpeechModel(
   const loaded: [unknown] = [null];
   check(native.modelLoad(registry[0], modelPath, null, null, loaded), 'model load');
   const model = loaded[0];
-  const openSession = (sessionBackend: string) => {
+  const openSession = (sessionBackend: Backend) => {
     const session: [unknown] = [null];
     check(native.sessionCreate(model, 'tts', 'streaming', { backend: sessionBackend, device: 0, threads }, null, session), `${sessionBackend} session creation`);
     return session[0];
   };
   let session: unknown;
-  let sessionBackend = backend;
+  let sessionBackend: Backend = backend;
   try {
     if (!native.modelSupports(model, 'tts', 'streaming')) throw new Error('This model does not support streaming text to speech.');
     try {
@@ -102,8 +105,8 @@ export function loadSpeechModel(
     throw error;
   }
 
-  // Reads one event's audio. Copies it out before the event is freed: koffi.decode copies,
-  // while koffi.view would wrap native memory, which Electron's V8 refuses.
+  // Reads one event's audio, copying it out before the event is freed. koffi.decode copies;
+  // koffi.view would only borrow the event's memory, and it aborts under Electron's V8.
   const readEvent = (event: unknown): Audio => {
     try {
       const samples: [unknown] = [null];
@@ -131,7 +134,8 @@ export function loadSpeechModel(
       const request = native.requestCreate();
       if (!request) throw new Error('audio.cpp could not allocate a request.');
       try {
-        check(native.requestSetText(request, text, language ?? null), 'request text');
+        // The C API takes NULL for no language, so the model picks its own.
+        check(language ? native.requestSetText(request, text, language) : native.requestSetText(request, text, null), 'request text');
         for (const [key, value] of Object.entries(options)) check(native.requestSetOption(request, key, value), `request option ${key}`);
         check(native.streamStart(session, request), 'stream start');
       } finally {

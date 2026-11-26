@@ -16,5 +16,5 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true
   },
-  "include": ["skills/**/scripts/*.ts"]
+  "include": ["skills/**/scripts/*.ts", "tests/*.ts"]
 }

@@ -62,15 +62,18 @@ Either way, the walkthrough delivers a separate narrated MP4 and preserves the o
 git -C ~/developer-tools/ui-walkthrough-video pull --ff-only
 ```
 
-The links point to the checkout, so pulling updates updates both installed skills. Rerun the installer if you move the checkout or add an installation for another agent.
+The links point to the checkout, so pulling updates updates both installed skills. Rerun the installer if you move the checkout, add an installation for another agent, or update from a version that had the `elevenlabs-narration` skill: that skill is now `narration`, and the installer replaces the old link.
 
 ## Developing the helpers
 
-The helpers in `skills/*/scripts/` are TypeScript. To type-check them:
+The helpers in `skills/*/scripts/` are TypeScript. To type-check and test them:
 
 ```bash
 pnpm install
 pnpm typecheck
+pnpm test
 ```
+
+The tests need `ffmpeg`. They check narration plans and voice choice through `--dry-run`, which downloads nothing and loads no speech model, plus the clip cache names and the installer.
 
 `tsconfig.json` allows only syntax that Node's type stripping can run unchanged.
