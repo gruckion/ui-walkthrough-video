@@ -3,7 +3,7 @@
 Two skills for Codex and Claude Code, installed together:
 
 - [ui-walkthrough-video](skills/ui-walkthrough-video/SKILL.md) records the changed flow in the real application, with a title card, captions and cursor, then verifies the video.
-- [elevenlabs-narration](skills/elevenlabs-narration/SKILL.md) adds timed speech to a finished video. The walkthrough skill uses it automatically when `ELEVENLABS_API_KEY` is set; otherwise it delivers a voiceless video. You can also request narration for an existing video independently.
+- [narration](skills/narration/SKILL.md) adds timed speech to a finished video. By default it uses Kokoro, an open text-to-speech model that runs on your machine with no account or key; ElevenLabs is available on request. The walkthrough skill narrates automatically unless you ask for a voiceless video. You can also request narration for an existing video independently.
 
 The walkthrough derives its scope from the actual diff, sets up the changed application locally, and records a rehearsed path using real authentication and app-supported data. Recording scripts and outputs live in `~/ui-walkthroughs/<ticket-or-pr>/` so they survive worktree cleanup.
 
@@ -27,7 +27,7 @@ Both skills are available for your next request. Ask:
 
 > Create a UI walkthrough video for this PR: https://github.com/your-team/your-app/pull/123
 
-Or invoke `ui-walkthrough-video` or `elevenlabs-narration` by name in your agent.
+Or invoke `ui-walkthrough-video` or `narration` by name in your agent.
 
 ## Requirements
 
@@ -39,11 +39,11 @@ Or invoke `ui-walkthrough-video` or `elevenlabs-narration` by name in your agent
 
 Install the required tools separately. API keys and app credentials belong in each developer's local environment.
 
-## Optional voice setup
+## Voices
 
-Create a key in the [ElevenLabs API-key dashboard](https://elevenlabs.io/app/developers/api-keys) with Text to Speech access. Each developer supplies their own key; keys are never part of this repository or installer.
+**Kokoro (default)** needs no setup. The first narration downloads the model, its eSpeak data and the audio.cpp library (about 225 MB on macOS) into `~/.cache/ui-walkthrough-video/kokoro/` and checks each file's SHA-256. If [T3 Code](https://github.com/pingdotgg/t3code) has already downloaded the same files, they are reused. Builds exist for macOS, Linux and Windows on x64 and arm64. The default voice is `af_heart`; the [narration skill](skills/narration/SKILL.md) lists the others.
 
-For zsh, add these exports to `~/.zshrc` and open a new shell:
+**ElevenLabs (on request)** needs your own key. Create one in the [ElevenLabs API-key dashboard](https://elevenlabs.io/app/developers/api-keys) with Text to Speech access. Keys are never part of this repository or installer. For zsh, add these exports to `~/.zshrc` and open a new shell:
 
 ```bash
 export ELEVENLABS_API_KEY='your-own-key'
@@ -52,9 +52,9 @@ export ELEVENLABS_VOICE_ID='IKne3meq5aSn9XLyUdCD'
 export ELEVENLABS_MODEL_ID='eleven_multilingual_v2'
 ```
 
-Charlie (`IKne3meq5aSn9XLyUdCD`) and `eleven_multilingual_v2` are the defaults. An explicit voice/model request takes priority over environment overrides. Choose a voice your account can use through the API; website previews alone do not establish API access. Narration consumes ElevenLabs credits.
+Charlie (`IKne3meq5aSn9XLyUdCD`) and `eleven_multilingual_v2` are the ElevenLabs defaults. Choose a voice your account can use through the API; website previews alone do not establish API access. Narration consumes ElevenLabs credits.
 
-With a key, the walkthrough delivers a separate narrated MP4 and preserves the original visual track. Without a key, it produces the usual voiceless video. Asking for a voiceless video overrides automatic narration. Authentication, quota or generation failures are reported rather than presented as successful narration.
+Either way, the walkthrough delivers a separate narrated MP4 and preserves the original visual track. Spoken lines are cached by voice and text, so a rebuild only generates the lines that changed. Asking for a voiceless video turns narration off. Failures are reported rather than presented as successful narration.
 
 ## Update
 

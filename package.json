@@ -13,5 +13,8 @@
     "@types/node": "24.19.4",
     "playwright": "1.65.1",
     "typescript": "7.0.2"
+  },
+  "dependencies": {
+    "koffi": "3.3.6"
   }
 }

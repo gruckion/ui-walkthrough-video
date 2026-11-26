@@ -31,7 +31,9 @@ for arg in "$@"; do
 done
 
 repo_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
-names=(ui-walkthrough-video elevenlabs-narration)
+names=(ui-walkthrough-video narration)
+# Earlier versions installed the narration skill under this name.
+old_names=(elevenlabs-narration)
 roots=()
 agents=()
 if [[ "$mode" == both || "$mode" == codex ]]; then
@@ -72,6 +74,14 @@ backup_dir=
 for ((i=0; i<${#roots[@]}; i++)); do
   root=${roots[$i]}
   mkdir -p -- "$root"
+  # Remove only links that point into this checkout under an old name; they no longer resolve.
+  for name in "${old_names[@]}"; do
+    target="$root/$name"
+    if [[ -L "$target" && "$(readlink "$target")" == "$repo_dir/skills/$name" ]]; then
+      rm -- "$target"
+      printf 'Removed old link: %s\n' "$target"
+    fi
+  done
   for name in "${names[@]}"; do
     source="$repo_dir/skills/$name"
     target="$root/$name"
