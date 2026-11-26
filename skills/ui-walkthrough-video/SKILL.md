@@ -252,8 +252,9 @@ the artifact therefore takes three steps, all encapsulated in the bundled helper
    same API the app calls (reuse the session/token captured during auth setup). Never show
    a pre-generated stand-in whose content couldn't include this take's data.
 2. **Convert a page to PNG** (`pdftoppm -png -singlefile`, `sips` fallback on macOS).
-3. **Navigate the recorded page to a minimal local viewer page** showing the image with a
-   title bar and optional callout, dwell ~5s, then `goto` back into the app. The viewer
+3. **Navigate the recorded page to a minimal local viewer page** showing the image below a
+   header bar that holds the title and the optional callout, dwell ~5s, then `goto` back into
+   the app. Nothing is drawn over the document (see "Scene text placement"). The viewer
    must declare `<meta charset="utf-8">` — without it, em dashes and curly quotes in the
    title render as mojibake on `file://` pages (a real retake cause).
 
@@ -321,11 +322,18 @@ The output is `--viewport` plus 64px of height for the bar, so record at the sam
 you pass here. Record in more than one take when state must change between scenes (a flag,
 a fresh page load); the build joins them in the order given.
 
-Rules for caption and title text:
+Scene text placement: all text that explains a scene sits above the content, in the caption
+bar or in an interstitial's header bar. Never draw a banner, box, label or callout over the
+app or over a document being shown. The viewer cannot tell it from the UI or the document,
+and it hides what the scene demonstrates. This applies to every helper you write, not only
+the bundled ones.
+
+Rules for caption, title, callout and narration text:
 
 - Keep each caption under 120 characters. It must fit on one line of the bar.
 - Describe only the visible product behavior, user action, or state transition being demonstrated.
 - Do not mention recording mechanics, auth setup, skipped login, seeded sessions, Playwright, test harnesses, implementation details, or anything relevant only to how the video was made.
+- State only what the change does now. No asides to colleagues ("that's a question for Paul"), open questions, or hints of work nobody agreed to ("no slip yet"). Those belong in the chat or the PR discussion, not in a video a stakeholder watches.
 - Do not add captions or the cursor by modifying app source. The cursor is injected only in the browser session, and the bar and title card are added at build time.
 - Before finalizing, inspect the title card and at least one frame per caption. Re-record if a caption is clipped or does not match what is on screen.
 
